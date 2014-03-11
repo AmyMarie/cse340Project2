@@ -1,5 +1,5 @@
 struct typeOrVar{
-	struct id_listNode* id;
+	char* id;
 	int identifier;
 };
 
@@ -172,12 +172,12 @@ struct primaryNode* primary();
 Semantic Checking Functions/Structures
 ----------------------------------------------------------------------------*/
 
-//bool isBuiltType();
+int getTypeNum(int x);
 
 /*--------------------------------------------------------------------------
 Deallocation Methods
 ----------------------------------------------------------------------------*/
-
+void freeArrays();
 void freeProgramMem(struct programNode* program);
 void freeDeclMem(struct declNode* dec);
 void freeType_decl_sectionMem(struct type_decl_sectionNode* typeDeclSection);

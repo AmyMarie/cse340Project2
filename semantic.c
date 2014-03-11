@@ -115,10 +115,12 @@ int ttype; // token type
 int activeToken = FALSE;
 int tokenLength;
 
-int numOfTypes; 
-int numOfVars;
-struct typeVar* arrayOfTypes[100];
-struct typeVar* arrayOfVars[100];
+int numOfExplicits=0; 
+int numOfImplicits=0;
+struct typeOrVar* arrayExplicitTypes[100];
+struct typeOrVar* arrayImplicitTypes[100];
+int numOfTypes=0;
+//int typeOrVar; //0=type, 1=var, used for placement in arrayT vs arrayV
 
 int line_no = 1;
 
@@ -314,6 +316,24 @@ void syntax_error(char* NT, int line_no)
 /*-------------------------------------------------------------------
 	DEALLOCATING MEMORY
 --------------------------------------------------------------------*/
+
+void freeArrays()
+{
+	int i;
+	int j;
+	for(i=0; i<numOfImplicits;i++)
+	{
+		free(arrayImplicitTypes[i]->id);
+		free(arrayImplicitTypes[i]);
+	}
+
+	for(j=0;j<numOfExplicits;j++)
+	{
+		free(arrayExplicitTypes[j]->id);
+		free(arrayExplicitTypes[j]);
+	}
+}
+
 void freeProgramMem(struct programNode* program)
 {
 	freeDeclMem(program->decl);
@@ -384,6 +404,7 @@ void freeType_declMem(struct type_declNode* typeDecl)
 
 void freeType_nameMem(struct type_nameNode* typeName)
 {
+	free(typeName->id);
 	free(typeName);
 }
 
@@ -393,7 +414,7 @@ void freeId_listMem(struct id_listNode* idList)
 		freeId_listMem(idList->id_list);
 		idList->id_list = NULL;
 	}
-	
+	free(idList->id);
 	free(idList);
 }
 
@@ -524,6 +545,7 @@ void freeConditionNodeMem(struct conditionNode* condNode)
 
 void freePrimaryNodeMem(struct primaryNode* primNode)
 {
+	free(primNode->id);
 	free(primNode);
 }
 
@@ -536,6 +558,7 @@ void freeAssign_stmtNodeMem(struct assign_stmtNode* assignNode)
 		assignNode->expr = NULL;
 	}
 
+	free(assignNode->id);
 	free(assignNode);
 }
 
@@ -790,6 +813,38 @@ struct conditionNode* make_conditionNode()
 	return (struct conditionNode*) malloc(sizeof (struct conditionNode));
 }
 /*--------------------------------------------------------------------*/
+
+
+int getTypeNum(int x)
+{
+
+	if(x == INT)
+	{
+		return 10;
+	}
+
+	else if(x == REAL)
+	{
+		return 11;
+	}
+
+	else if(x == STRING)
+	{
+		return 12;
+	}
+
+	else if(x == BOOLEAN)
+	{
+		return 13;
+	}
+
+	else
+	{
+		return 14+numOfTypes;
+	}
+	
+}
+
 
 /*--------------------------------------------------------------------
   PARSING AND BUILDING PARSE TREE
@@ -1194,6 +1249,8 @@ struct id_listNode* id_list()
 	if (ttype == ID) {
 		idList->id = (char*) malloc(tokenLength + 1);
 		strcpy(idList->id, token);
+
+
 		ttype = getToken();
 		if (ttype == COMMA) {
 			idList->id_list = id_list();
@@ -1224,12 +1281,14 @@ struct var_declNode* var_decl()
 		ungetToken();
 		varDecl->id_list = id_list();
 		ttype = getToken();
+	
 		if (ttype == COLON) {
 			varDecl->type_name = type_name();
 			ttype = getToken();
 			if (ttype == SEMICOLON) {
 				return varDecl;
-			} else {
+			}
+			 else {
 				syntax_error("var_decl. SEMICOLON expected", line_no);
 				exit(0);
 			}
@@ -1283,17 +1342,76 @@ struct var_decl_sectionNode* var_decl_section()
 	}
 }
 
-struct type_decl_sectionNode* type_decl_section()
+struct type_declNode* type_decl()
 {
-	struct type_decl_sectionNode *typeDeclSection;
-	typeDeclSection = make_type_decl_sectionNode();
-
+	struct type_declNode* typeDecl;
+	typeDecl = make_type_declNode();
 	ttype = getToken();
-	if (ttype == TYPE) {
-		typeDeclSection->type_decl_list = type_decl_list();
-		return typeDeclSection;
+	if (ttype == ID) {
+		ungetToken();
+
+	//	typeOrVar = 0; //set to Type
+
+		typeDecl->id_list = id_list();
+		ttype = getToken();
+		if (ttype == COLON) {
+			typeDecl->type_name = type_name();
+	
+			int num = getTypeNum(typeDecl->type_name->type);
+printf("%s%d\n","type: ",num);
+printf("%s%d\n","numtype: ",numOfTypes);
+
+			if(num>13) //is an ID, so implicit type, add to implicit array
+			{
+		
+printf("%s%s\n","id: ",typeDecl->type_name->id);
+		
+				arrayImplicitTypes[numOfImplicits] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+				arrayImplicitTypes[numOfImplicits]->id = (char*) malloc(strlen(typeDecl->type_name->id+1));
+				strcpy(arrayImplicitTypes[numOfImplicits]->id, typeDecl->type_name->id);
+				arrayImplicitTypes[numOfImplicits]->identifier = num;
+printf("%s%d\n","2num",num);
+				numOfImplicits++;
+				numOfTypes++;
+			}
+
+//			do //add each id in idlist into explicit array
+//			{
+				arrayExplicitTypes[numOfExplicits] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+				arrayExplicitTypes[numOfExplicits]->id = (char*) malloc(strlen(typeDecl->id_list->id+1));
+				strcpy(arrayExplicitTypes[numOfExplicits]->id, typeDecl->id_list->id);
+				arrayExplicitTypes[numOfExplicits]->identifier = num;
+				numOfExplicits++;
+				numOfTypes++;
+//			}
+
+			struct id_listNode *node = typeDecl->id_list;
+			while(node->id_list != NULL)
+			{
+				node=node->id_list;
+				arrayExplicitTypes[numOfExplicits] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+				arrayExplicitTypes[numOfExplicits]->id = (char*) malloc(strlen(node->id+1));
+				strcpy(arrayExplicitTypes[numOfExplicits]->id, node->id);
+				arrayExplicitTypes[numOfExplicits]->identifier = num;
+				numOfExplicits++;
+				numOfTypes++;
+				
+				
+			}
+			
+			ttype = getToken();
+			if (ttype == SEMICOLON) {
+				return typeDecl;
+			} else {
+				syntax_error("type_decl. SEMICOLON expected", line_no);
+				exit(0);
+			}
+		} else {
+			syntax_error("type_decl. COLON expected", line_no);
+			exit(0);
+		}
 	} else {
-		syntax_error("type_decl_section. TYPE expected", line_no);
+		syntax_error("type_decl. ID expected", line_no);
 		exit(0);
 	}
 }
@@ -1322,30 +1440,17 @@ struct type_decl_listNode* type_decl_list()
 	}
 }
 
-struct type_declNode* type_decl()
+struct type_decl_sectionNode* type_decl_section()
 {
-	struct type_declNode* typeDecl;
-	typeDecl = make_type_declNode();
+	struct type_decl_sectionNode *typeDeclSection;
+	typeDeclSection = make_type_decl_sectionNode();
+
 	ttype = getToken();
-	if (ttype == ID) {
-		ungetToken();
-		typeDecl->id_list = id_list();
-		ttype = getToken();
-		if (ttype == COLON) {
-			typeDecl->type_name = type_name();
-			ttype = getToken();
-			if (ttype == SEMICOLON) {
-				return typeDecl;
-			} else {
-				syntax_error("type_decl. SEMICOLON expected", line_no);
-				exit(0);
-			}
-		} else {
-			syntax_error("type_decl. COLON expected", line_no);
-			exit(0);
-		}
+	if (ttype == TYPE) {
+		typeDeclSection->type_decl_list = type_decl_list();
+		return typeDeclSection;
 	} else {
-		syntax_error("type_decl. ID expected", line_no);
+		syntax_error("type_decl_section. TYPE expected", line_no);
 		exit(0);
 	}
 }
@@ -1408,6 +1513,67 @@ struct programNode* program()
 	}
 }
 
+void printTypes()
+{
+	int arrayT[100];
+	int numInArray=0;
+	int i;
+	for(i=0; i<numOfExplicits;i++)
+	{
+		int n;
+		int j;
+		int skip=0;
+		//check if type has already been printed
+		for(j=0;j<numInArray;j++)
+		{
+			if(arrayT[j]==arrayExplicitTypes[i]->identifier)
+				skip =1;
+		}
+
+		//if type hasn't been printed
+		if(skip==0)
+		{
+			//check if type is a built in type
+			if(arrayExplicitTypes[i]->identifier<14)
+			{
+				if(arrayExplicitTypes[i]->identifier==10)
+					printf("%s", "INT:");
+				if(arrayExplicitTypes[i]->identifier==11)
+					printf("%s", "REAL:");
+				if(arrayExplicitTypes[i]->identifier==12)
+					printf("%s", "STRING:");
+				if(arrayExplicitTypes[i]->identifier==13)
+					printf("%s", "BOOLEAN:");
+				n=i;
+			}
+			else
+			{
+				printf("%s%s", arrayExplicitTypes[i]->id,":");
+				n=i+1;
+			}
+			arrayT[numInArray]=arrayExplicitTypes[i]->identifier;
+			numInArray++;
+			for(n; n<numOfExplicits;n++)
+			{
+				if(arrayExplicitTypes[i]->identifier == arrayExplicitTypes[n]->identifier)
+				{
+					printf("%s%s", " ", arrayExplicitTypes[n]->id); 
+				}
+			}
+			int m;
+			for(m=0; m<numOfImplicits;m++)
+			{
+				if(arrayExplicitTypes[i]->identifier == arrayImplicitTypes[m]->identifier)
+				{
+					printf("%s%s", " ", arrayImplicitTypes[m]->id);
+				}
+			}
+		printf("\n");
+		}
+	}
+
+}
+
 // COMMON mistakes:
 //    *     = instead of ==
 //    *     not allocating space before strcpy
@@ -1418,6 +1584,17 @@ int main()
 	parseTree = program();
 	print_parse_tree(parseTree);
 	freeProgramMem(parseTree);
+	int i;
+	for(i=0;i<numOfExplicits;i++)
+	{
+		printf("%s%d%s%s%s%d\n", "Explicit[",i,"]:",arrayExplicitTypes[i]->id, "num: ",arrayExplicitTypes[i]->identifier);
+	}
+	for(i=0;i<numOfImplicits;i++)
+	{
+		printf("%s%d%s%s%s%d\n", "Implicit[",i,"]:",arrayImplicitTypes[i]->id, "num: ",arrayImplicitTypes[i]->identifier);
+	}
+	printTypes();
+	freeArrays();
 	printf("\nSUCCESSFULLY PARSED INPUT!\n");
 	return 0;
 }
