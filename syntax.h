@@ -172,6 +172,28 @@ struct primaryNode* primary();
 Semantic Checking Functions/Structures
 ----------------------------------------------------------------------------*/
 
-bool isBuiltType();
+//bool isBuiltType();
 
+/*--------------------------------------------------------------------------
+Deallocation Methods
+----------------------------------------------------------------------------*/
+
+void freeProgramMem(struct programNode* program);
+void freeDeclMem(struct declNode* dec);
+void freeType_decl_sectionMem(struct type_decl_sectionNode* typeDeclSection);
+void freeType_decl_listMem(struct type_decl_listNode* typeDeclList);
+void freeType_declMem(struct type_declNode* typeDecl);
+void freeType_nameMem(struct type_nameNode* typeName);
+void freeId_listMem(struct id_listNode* idList);
+void freeVar_decl_sectionMem(struct var_decl_sectionNode* varDeclSection);
+void freeVar_decl_listMem(struct var_decl_listNode* varDeclList);
+void freeVar_declMem(struct var_declNode* varDecl);
+void freeBodyMem(struct bodyNode* body);
+void freeStmt_listNodeMem(struct stmt_listNode* stmtNode);
+void freeStmtNodeMem(struct stmtNode* stmt);
+void freeWhile_stmtNodeMem(struct while_stmtNode* whileNode);
+void freeConditionNodeMem(struct conditionNode* condNode);
+void freePrimaryNodeMem(struct primaryNode* primNode);
+void freeAssign_stmtNodeMem(struct assign_stmtNode* assignNode);
+void freeExprNodeMem(struct exprNode* exNode);
 

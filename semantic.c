@@ -342,7 +342,7 @@ void freeType_decl_sectionMem(struct type_decl_sectionNode* typeDeclSection)
 {
 	if (typeDeclSection->type_decl_list != NULL)
 	{
-		freeType_decl_listiMem(typeDeclSection->type_decl_list);
+		freeType_decl_listMem(typeDeclSection->type_decl_list);
 		typeDeclSection->type_decl_list = NULL;
 	}
 
@@ -359,7 +359,7 @@ void freeType_decl_listMem(struct type_decl_listNode* typeDeclList)
 	if (typeDeclList->type_decl_list != NULL)
 	{
 		freeType_decl_listMem(typeDeclList->type_decl_list);
-		typeDecList->type_decl = NULL;
+		typeDeclList->type_decl = NULL;
 	}
 
 	free(typeDeclList);
@@ -402,24 +402,164 @@ void freeVar_decl_sectionMem(struct var_decl_sectionNode* varDeclSection)
 	if (varDeclSection->var_decl_list != NULL)
 	{
 		freeVar_decl_listMem(varDeclSection->var_decl_list);
-		varDelcSection->var_decl_list = NULL;
+		varDeclSection->var_decl_list = NULL;
 	}
 	free(varDeclSection);
 }
 
-void print_var_decl_list(struct var_decl_listNode* varDeclList)
+void freeVar_decl_listMem(struct var_decl_listNode* varDeclList)
 {
-	print_var_decl(varDeclList->var_decl);
+	if(varDeclList->var_decl != NULL)
+	{
+		freeVar_declMem(varDeclList->var_decl);
+		varDeclList->var_decl = NULL;
+	}
+
 	if (varDeclList->var_decl_list != NULL)
-		print_var_decl_list(varDeclList->var_decl_list);
+	{
+		freeVar_decl_listMem(varDeclList->var_decl_list);
+		varDeclList->var_decl_list = NULL;
+	}
+	
+	free(varDeclList);
 }
 
-void print_var_decl(struct var_declNode* varDecl)
+void freeVar_declMem(struct var_declNode* varDecl)
 {
-	print_id_list(varDecl->id_list);
-	printf(": ");
-	print_type_name(varDecl->type_name);
-	printf(";\n");
+	if(varDecl->id_list != NULL)
+	{
+		freeId_listMem(varDecl->id_list);
+		varDecl->id_list = NULL;
+	}
+
+	if(varDecl-> type_name != NULL)
+	{
+		freeType_nameMem(varDecl->type_name);
+		varDecl->type_name = NULL;
+	}
+
+	free(varDecl);
+}
+
+void freeBodyMem(struct bodyNode* body)
+{
+	if(body->stmt_list != NULL)
+	{
+		freeStmt_listNodeMem(body->stmt_list);
+		body->stmt_list = NULL;
+	}
+
+	free(body);
+}
+
+void freeStmt_listNodeMem(struct stmt_listNode* stmtNode)
+{
+	if(stmtNode->stmt != NULL)
+	{
+		freeStmtNodeMem(stmtNode->stmt);
+		stmtNode->stmt = NULL;
+	}
+
+	if(stmtNode->stmt_list != NULL)
+	{
+		freeStmt_listNodeMem(stmtNode->stmt_list);
+		stmtNode->stmt_list = NULL;
+	}
+	
+	free(stmtNode);
+}
+
+void freeStmtNodeMem(struct stmtNode* stmt)
+{
+
+	
+	if(stmt->stmtType == WHILE)
+	{
+		freeWhile_stmtNodeMem(stmt->while_stmt);
+		stmt->while_stmt = NULL;
+	}
+
+	else
+	{
+		freeAssign_stmtNodeMem(stmt->assign_stmt);
+		stmt->assign_stmt = NULL;
+	}
+	
+	free(stmt);
+}
+
+void freeWhile_stmtNodeMem(struct while_stmtNode* whileNode)
+{
+	if(whileNode->condition != NULL)
+	{
+		freeConditionNodeMem(whileNode->condition);
+		whileNode->condition = NULL;
+	}
+
+	if(whileNode->body != NULL)
+	{
+		freeBodyMem(whileNode->body);
+		whileNode->body = NULL;
+	}
+
+	free(whileNode);
+}
+
+void freeConditionNodeMem(struct conditionNode* condNode)
+{
+	if(condNode->left_operand != NULL)
+	{
+		freePrimaryNodeMem(condNode->left_operand);
+		condNode->left_operand = NULL;
+	}
+
+	if(condNode->right_operand != NULL)
+	{
+		freePrimaryNodeMem(condNode->right_operand);
+		condNode->right_operand = NULL;
+	}
+
+	free(condNode);
+}
+
+void freePrimaryNodeMem(struct primaryNode* primNode)
+{
+	free(primNode);
+}
+
+
+void freeAssign_stmtNodeMem(struct assign_stmtNode* assignNode)
+{
+	if(assignNode->expr != NULL)
+	{
+		freeExprNodeMem(assignNode->expr);
+		assignNode->expr = NULL;
+	}
+
+	free(assignNode);
+}
+
+void freeExprNodeMem(struct exprNode* exNode)
+{
+	if(exNode->primary != NULL)
+	{
+		freePrimaryNodeMem(exNode->primary);
+		exNode->primary = NULL;
+	}
+
+	if(exNode->leftOperand != NULL)
+	{
+		freeExprNodeMem(exNode->leftOperand);
+		exNode->leftOperand = NULL;
+	}
+
+	if(exNode->rightOperand != NULL)
+	{
+		freeExprNodeMem(exNode->rightOperand);
+		exNode->rightOperand = NULL;
+	}
+
+	free(exNode);
 }
 /*--------------------------------------------------------------------
   PRINTING PARSE TREE
@@ -899,7 +1039,7 @@ struct while_stmtNode* while_stmt()
 	
 	if(ttype == WHILE)
 	{
-
+printf("%s\n","inside while");
 		ttype = getToken();
 		
 		if(ttype == ID ||ttype == NUM || ttype == REALNUM)
@@ -983,7 +1123,7 @@ struct stmt_listNode* stmt_list()
 	ttype = getToken();
 
 
-	if ((ttype == ID) | (ttype == WHILE)) {
+	if ((ttype == ID) || (ttype == WHILE)) {
 		ungetToken();
 		stmtList = make_stmt_listNode();
 		stmtList->stmt = stmt();
@@ -1277,6 +1417,7 @@ int main()
 	struct programNode* parseTree;
 	parseTree = program();
 	print_parse_tree(parseTree);
+	freeProgramMem(parseTree);
 	printf("\nSUCCESSFULLY PARSED INPUT!\n");
 	return 0;
 }
