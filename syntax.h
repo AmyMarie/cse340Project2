@@ -1,6 +1,7 @@
 struct typeOrVar{
 	char* id;
 	int identifier;
+	int check;
 };
 
 struct programNode {

@@ -115,10 +115,24 @@ int ttype; // token type
 int activeToken = FALSE;
 int tokenLength;
 
-int numOfExplicits=0; 
-int numOfImplicits=0;
+int numOfExpTypes=0; 
+int numOfImpTypes=0;
 struct typeOrVar* arrayExplicitTypes[100];
 struct typeOrVar* arrayImplicitTypes[100];
+
+int numOfExpVars=0;
+int numOfImpVars=0;
+struct typeOrVar* arrayExplicitVars[100];
+struct typeOrVar* arrayImplicitVars[100];
+	int arrayTEx[100];
+	int arrayTIm[100];
+	int numTExArray=0;
+	int numTImArray=0;
+	int arrayVEx[100];
+	int arrayVIm[100];
+	int numVExArray=0;
+	int numVImArray=0;
+
 int numOfTypes=0;
 //int typeOrVar; //0=type, 1=var, used for placement in arrayT vs arrayV
 
@@ -321,16 +335,27 @@ void freeArrays()
 {
 	int i;
 	int j;
-	for(i=0; i<numOfImplicits;i++)
+	for(i=0; i<numOfImpTypes;i++)
 	{
 		free(arrayImplicitTypes[i]->id);
 		free(arrayImplicitTypes[i]);
 	}
 
-	for(j=0;j<numOfExplicits;j++)
+	for(j=0;j<numOfExpTypes;j++)
 	{
 		free(arrayExplicitTypes[j]->id);
 		free(arrayExplicitTypes[j]);
+	}
+	for(j=0;j<numOfExpVars;j++)
+	{
+		free(arrayExplicitVars[j]->id);
+		free(arrayExplicitVars[j]);
+	}
+	
+	for(j=0;j<numOfImpVars;j++)
+	{
+		free(arrayImplicitVars[j]->id);
+		free(arrayImplicitVars[j]);
 	}
 }
 
@@ -840,7 +865,7 @@ int getTypeNum(int x)
 
 	else
 	{
-		return 14+numOfTypes;
+		return 14+numOfImpVars+numOfExpVars+numOfImpTypes+numOfExpTypes;
 	}
 	
 }
@@ -986,6 +1011,7 @@ struct exprNode* factor()
 		facto->primary->tag = ID;
 		facto->primary->id = (char *) malloc((tokenLength + 1) * sizeof (char));
 		strcpy(facto->primary->id, token);
+
 		return facto;
 	} else {
 		syntax_error("factor. NUM, REALNUM, or ID, expected", line_no);
@@ -1010,6 +1036,155 @@ struct exprNode* term()
 			ter->leftOperand = f;
 			ter->rightOperand = term();
 			ter->tag = EXPR;
+			int num1=-1;
+			int num2;
+			//check if left and right operands are of same type
+			//get type num of left operand
+				int tag = ter->leftOperand->primary->tag;
+				if(tag == NUM)
+					num1 = 10;
+				else if(tag == REALNUM)
+					num1 = 11;
+				else 
+				{
+					int i;
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(arrayImplicitVars[i]->id,ter->leftOperand->primary->id)==0)
+						{
+							num1 = arrayImplicitVars[i]->identifier;
+						}
+					}
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(arrayExplicitVars[i]->id,ter->leftOperand->primary->id)==0)
+						{
+							num1 = arrayExplicitVars[i]->identifier;
+						}
+					}
+					//if it hasn't been declared as a variable, assign it a type and add it to implicit var array
+					if(num1=-1)
+					{
+						//get type num
+						num1 = getTypeNum(tag);
+						arrayImplicitVars[numOfImpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+						arrayImplicitVars[numOfImpVars]->id = (char*) malloc(sizeof(ter->leftOperand->primary->id+1));
+						strcpy(arrayImplicitVars[numOfImpVars]->id, ter->leftOperand->primary->id);
+						arrayImplicitVars[numOfImpVars]->identifier = num1;
+						numOfImpVars++;
+					}
+		
+				}
+				//get type num of right operand
+				tag = ter->rightOperand->primary->tag;
+				if(tag == NUM)
+					num2 = 10;
+				else if(tag == REALNUM)	
+					num2 = 11;
+				else
+				{
+					int i;	
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(arrayImplicitVars[i]->id,ter->rightOperand->primary->id)==0)
+						{
+							num2 = arrayImplicitVars[i]->identifier;
+						}
+					}
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(arrayExplicitVars[i]->id,ter->rightOperand->primary->id)==0)
+						{
+							num2 = arrayExplicitVars[i]->identifier;
+						}
+					}
+					//if it hasn't been declared as a variable, assign it a type and add it to implicit var array
+					if(num2=-1)
+					{
+						//get type num
+						num2 = getTypeNum(tag);
+						arrayImplicitVars[numOfImpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+						arrayImplicitVars[numOfImpVars]->id = (char*) malloc(sizeof(ter->rightOperand->primary->id+1));
+						strcpy(arrayImplicitVars[numOfImpVars]->id,ter->rightOperand->primary->id);
+						arrayImplicitVars[numOfImpVars]->identifier = num2;
+						numOfImpVars++;
+					}
+				}
+				//test if types are the same, if not type mismatch
+				//check if they have different built in types, type mismatch
+				if(num1 < 14 && num2 < 14 && num1 != num2)
+				{
+					printf("%s\n", "ERROR CODE 3"); //type mismatch
+					exit(0);
+				}
+				int leftIsImp;	
+				if(num1>13)
+				{		
+					 leftIsImp = checkImpVar(ter->leftOperand->primary->id);
+				}
+				else
+					 leftIsImp = 0;
+				int rightIsImp;	
+				if(num2 >13)
+				{	
+					rightIsImp = checkImpVar(ter->rightOperand->primary->id);
+				
+				}	
+				else
+					rightIsImp = 0;
+				//if left is impliciit and right is built in, change id type value to expr type value
+				if(leftIsImp == 1 && num2 < 14)
+				{
+					//loop through all types and variables and change identifier to typeNum
+						int j;
+						for(j=0;j<numOfImpVars;j++)
+						{
+							if(arrayImplicitVars[j]->identifier == num1)
+								arrayImplicitVars[j]->identifier = num2;
+						}
+						for(j=0;j<numOfExpVars;j++)
+						{
+							if(arrayExplicitVars[j]->identifier == num1)
+								arrayExplicitVars[j]->identifier = num2;
+						}
+						for(j=0;j<numOfImpTypes;j++)
+						{
+							if(arrayImplicitTypes[j]->identifier == num1)
+								arrayImplicitTypes[j]->identifier = num2;
+						}
+						for(j=0;j<numOfExpTypes;j++)
+						{
+							if(arrayExplicitTypes[j]->identifier == num1)
+								arrayExplicitTypes[j]->identifier = num2;
+						}
+				}
+	
+				//id and expr are implicit and different types, change everything to type num of expr
+				if(leftIsImp == 1 && rightIsImp == 1 && num1 != num2)
+				{
+					//loop through all types and variables and change identifier to typeNum
+					int j;
+					for(j=0;j<numOfImpVars;j++)
+					{
+						if(arrayImplicitVars[j]->identifier == num1)
+							arrayImplicitVars[j]->identifier = num2;
+					}
+					for(j=0;j<numOfExpVars;j++)
+					{
+						if(arrayExplicitVars[j]->identifier == num1)
+							arrayExplicitVars[j]->identifier = num2;
+					}
+					for(j=0;j<numOfImpTypes;j++)
+					{
+						if(arrayImplicitTypes[j]->identifier == num1)
+							arrayImplicitTypes[j]->identifier = num2;
+					}
+					for(j=0;j<numOfExpTypes;j++)
+					{
+						if(arrayExplicitTypes[j]->identifier == num1)
+							arrayExplicitTypes[j]->identifier = num2;
+					}
+				}
 			return ter;
 		} else
 			if ((ttype == SEMICOLON) | (ttype == PLUS) | (ttype == MINUS) | (ttype == RPAREN)) {
@@ -1031,31 +1206,244 @@ struct exprNode* expr()
 	struct exprNode* t;
 
 	ttype = getToken();
-	if ((ttype == ID) | (ttype == LPAREN) | (ttype == NUM) | (ttype == REALNUM)) {
+	if ((ttype == ID) | (ttype == LPAREN) | (ttype == NUM) | (ttype == REALNUM))
+	{
 		ungetToken();
 		t = term();
 		ttype = getToken();
-		if ((ttype == PLUS) | (ttype == MINUS)) {
+		if ((ttype == PLUS) | (ttype == MINUS))
+		 {
 			exp = make_exprNode();
 			exp->operator = ttype;
 			exp->leftOperand = t;
 			exp->rightOperand = expr();
 			exp->tag = EXPR;
-			return exp;
-		} else
-			if ((ttype == SEMICOLON) | (ttype == MULT) | (ttype == DIV) | (ttype == RPAREN)) {
+			int num1=-1;
+			int num2;
+			//check if left and right operands are of same type
+			//get type num of left operand
+				int tag = exp->leftOperand->primary->tag;
+				if(tag == NUM)
+					num1 = 10;
+				else if(tag == REALNUM)
+					num1 = 11;
+				else 
+				{
+					int i;
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(arrayImplicitVars[i]->id,exp->leftOperand->primary->id)==0)
+						{
+							num1 = arrayImplicitVars[i]->identifier;
+						}
+					}
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(arrayExplicitVars[i]->id,exp->leftOperand->primary->id)==0)
+						{
+							num1 = arrayExplicitVars[i]->identifier;
+						}
+					}
+					//if it hasn't been declared as a variable, assign it a type and add it to implicit var array
+					if(num1=-1)
+					{
+						//get type num
+						num1 = getTypeNum(tag);
+						arrayImplicitVars[numOfImpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+						arrayImplicitVars[numOfImpVars]->id = (char*) malloc(sizeof(exp->leftOperand->primary->id+1));
+						strcpy(arrayImplicitVars[numOfImpVars]->id, exp->leftOperand->primary->id);
+						arrayImplicitVars[numOfImpVars]->identifier = num1;
+						numOfImpVars++;
+					}
+		
+				}
+				//get type num of right operand
+				tag = exp->rightOperand->primary->tag;
+				if(tag == NUM)
+					num2 = 10;
+				else if(tag == REALNUM)	
+					num2 = 11;
+				else
+				{
+					int i;	
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(arrayImplicitVars[i]->id,exp->rightOperand->primary->id)==0)
+						{
+							num2 = arrayImplicitVars[i]->identifier;
+						}
+					}
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(arrayExplicitVars[i]->id,exp->rightOperand->primary->id)==0)
+						{
+							num2 = arrayExplicitVars[i]->identifier;
+						}
+					}
+					//if it hasn't been declared as a variable, assign it a type and add it to implicit var array
+					if(num2=-1)
+					{
+						//get type num
+						num2 = getTypeNum(tag);
+						arrayImplicitVars[numOfImpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+						arrayImplicitVars[numOfImpVars]->id = (char*) malloc(sizeof(exp->rightOperand->primary->id+1));
+						strcpy(arrayImplicitVars[numOfImpVars]->id,exp->rightOperand->primary->id);
+						arrayImplicitVars[numOfImpVars]->identifier = num2;
+						numOfImpVars++;
+					}
+				}
+				//test if types are the same, if not type mismatch
+				//check if they have different built in types, type mismatch
+				if(num1 < 14 && num2 < 14 && num1 != num2)
+				{
+					printf("%s\n", "ERROR CODE 3"); //type mismatch
+					exit(0);
+				}
+				int leftIsImp;	
+				if(num1>13)
+				{		
+					 leftIsImp = checkImpVar(exp->leftOperand->primary->id);
+				}
+				else
+					 leftIsImp = 0;
+				int rightIsImp;	
+				if(num2 >13)
+				{	
+					rightIsImp = checkImpVar(exp->rightOperand->primary->id);
+				
+				}	
+				else
+					rightIsImp = 0;
+				//if left is impliciit and right is built in, change id type value to expr type value
+				if(leftIsImp == 1 && num2 < 14)
+				{
+					//loop through all types and variables and change identifier to typeNum
+						int j;
+						for(j=0;j<numOfImpVars;j++)
+						{
+							if(arrayImplicitVars[j]->identifier == num1)
+								arrayImplicitVars[j]->identifier = num2;
+						}
+						for(j=0;j<numOfExpVars;j++)
+						{
+							if(arrayExplicitVars[j]->identifier == num1)
+								arrayExplicitVars[j]->identifier = num2;
+						}
+						for(j=0;j<numOfImpTypes;j++)
+						{
+							if(arrayImplicitTypes[j]->identifier == num1)
+								arrayImplicitTypes[j]->identifier = num2;
+						}
+						for(j=0;j<numOfExpTypes;j++)
+						{
+							if(arrayExplicitTypes[j]->identifier == num1)
+								arrayExplicitTypes[j]->identifier = num2;
+						}
+				}
+	
+				//id and expr are implicit and different types, change everything to type num of expr
+				if(leftIsImp == 1 && rightIsImp == 1 && num1 != num2)
+				{
+					//loop through all types and variables and change identifier to typeNum
+					int j;
+					for(j=0;j<numOfImpVars;j++)
+					{
+						if(arrayImplicitVars[j]->identifier == num1)
+							arrayImplicitVars[j]->identifier = num2;
+					}
+					for(j=0;j<numOfExpVars;j++)
+					{
+						if(arrayExplicitVars[j]->identifier == num1)
+							arrayExplicitVars[j]->identifier = num2;
+					}
+					for(j=0;j<numOfImpTypes;j++)
+					{
+						if(arrayImplicitTypes[j]->identifier == num1)
+							arrayImplicitTypes[j]->identifier = num2;
+					}
+					for(j=0;j<numOfExpTypes;j++)
+					{
+						if(arrayExplicitTypes[j]->identifier == num1)
+							arrayExplicitTypes[j]->identifier = num2;
+					}
+				}
+					
+			return exp;	
+		}
+		else if ((ttype == SEMICOLON) | (ttype == MULT) | (ttype == DIV) | (ttype == RPAREN))
+		{
 			ungetToken();
 			return t;
-		} else {
-			syntax_error("expr. PLUS, MINUS, or SEMICOLON expected", line_no);
-			exit(0);
 		}
-	} else {
+				
+		else 
+		{
+				syntax_error("expr. PLUS, MINUS, or SEMICOLON expected", line_no);
+				exit(0);
+		}
+	}	 
+	else {
 		syntax_error("expr. ID, LPAREN, NUM, or REALNUM expected", line_no);
 		exit(0);
 	}
 }
 
+int checkExpType(char* token)
+{
+	int i;
+	int flag=0;
+	for(i=0;i<numOfExpTypes;i++)
+	{
+		if(strcmp(arrayExplicitTypes[i]->id,token)==0)
+		{
+			flag = 1;
+		}
+	}
+	return flag;
+}
+
+int checkImpType(char* token)
+{
+	int i;
+	int flag=0;
+	for(i=0;i<numOfImpTypes;i++)
+	{
+		if(strcmp(arrayImplicitTypes[i]->id,token)==0)
+		{
+			flag = 1;
+		}
+	}
+	return flag;
+}
+
+
+int checkExpVar(char* token)
+{
+	int i;
+	int flag=0;
+	for(i=0;i<numOfExpVars;i++)
+	{
+		if(strcmp(arrayExplicitVars[i]->id,token)==0)
+		{
+			flag = 1;
+		}
+	}
+	return flag;
+}
+
+int checkImpVar(char* token)
+{
+	int i;
+	int flag=0;
+	for(i=0;i<numOfImpVars;i++)
+	{
+		if(strcmp(arrayImplicitVars[i]->id,token)==0)
+		{
+			flag = 1;
+		}
+	}
+	return flag;
+}
 struct assign_stmtNode* assign_stmt()
 {
 	struct assign_stmtNode* assignStmt;
@@ -1065,9 +1453,198 @@ struct assign_stmtNode* assign_stmt()
 		assignStmt = make_assign_stmtNode();
 		assignStmt->id = (char *) malloc((tokenLength + 1) * sizeof (char));
 		strcpy(assignStmt->id, token);
+
+		//check if token was declared as a type, if so error, type name redeclared as variable
+		int check = checkExpType(token);
+		int check2 = checkImpType(token);
+		if(check==1 || check2==1)
+		{
+			printf("%s\n","ERROR CODE 1");
+			exit(0);
+		}
+
+		//check if token is in explicit var array or implicit var array
+		//if it isn't in either, add it to implicit var array and assign it a type value
+		int checkIfMemAll = 0;
+		//loop through explicit array
+		int typeNumID=-1;
+		int typeNum=-1;
+		int i;
+		for(i=0;i<numOfExpVars;i++)
+		{
+			if(strcmp(arrayExplicitVars[i]->id,token)==0)
+			{
+				typeNumID = arrayExplicitVars[i]->identifier;
+			}
+
+		}
+
+		//loop through implicit var array
+		for(i=0;i<numOfImpVars;i++)
+		{
+			if(strcmp(arrayImplicitVars[i]->id,token)==0)
+			{
+				typeNumID = arrayImplicitVars[i]->identifier;
+			}
+
+		}
+		//if the var wasn't in either, add it to implicit var array
+		if(typeNumID == -1)
+		{
+			//allocate memory
+			arrayImplicitVars[numOfImpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+			arrayImplicitVars[numOfImpVars]->id = (char*) malloc(sizeof(strlen(token+1)));
+			checkIfMemAll = 1;
+			strcpy(arrayImplicitVars[numOfImpVars]->id,token);
+	                typeNumID=getTypeNum(ID);
+		arrayImplicitVars[numOfImpVars]->identifier = typeNumID;
+		numOfImpVars++;
+	         }
+		
 		ttype = getToken();
 		if (ttype == EQUAL) {
 			assignStmt->expr = expr();
+				
+				//check if each side of assignment statment has same type
+				//if they each have two different built in types, error code 3, type mismatch
+				//if one is implicit and one is built in, change implicit to be same type as built in
+				//if both are implicit, change one to match the other
+				//find value of expression
+				if(assignStmt->expr->tag == PRIMARY)
+				{
+					if(assignStmt->expr->primary->tag == NUM)
+					{
+						typeNum = 10;
+						if(checkIfMemAll ==1)
+							arrayImplicitVars[numOfImpVars-1]->identifier = 10;
+					}
+					else if(assignStmt->expr->primary->tag == REALNUM)
+					{	typeNum = 11;
+						if(checkIfMemAll ==1)
+							arrayImplicitVars[numOfImpVars-1]->identifier = 11;
+					}
+					else
+					{
+					//if not an explicit or implicit var add to array
+					int i;
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(arrayImplicitVars[i]->id,token)==0)
+							typeNum = arrayImplicitVars[i]->identifier;
+					}
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(arrayExplicitVars[i]->id,token)==0)
+							typeNum=arrayExplicitVars[i]->identifier;
+					}
+					if(typeNum == -1)
+					{
+
+						arrayImplicitVars[numOfImpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+						arrayImplicitVars[numOfImpVars]->id = (char*) malloc(sizeof(token+1));
+						strcpy(arrayImplicitVars[numOfImpVars]->id,token);
+						typeNum=getTypeNum(ID);
+						arrayImplicitVars[numOfImpVars]->identifier = typeNum;
+						numOfImpVars++;
+		
+				}
+				}
+	
+				
+				
+				
+				}
+
+				else //else find type num of left operand 
+				{	
+					int tagL = assignStmt->expr->leftOperand->primary->tag;
+					if(tagL == INT)
+						typeNum = 10;
+					else if(tagL==REAL)
+						typeNum = 11;
+					else
+					{
+					int i;
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(arrayImplicitVars[i]->id,assignStmt->expr->leftOperand->primary->id)==0)
+							typeNum = arrayImplicitVars[i]->identifier;
+					}
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(arrayExplicitVars[i]->id,assignStmt->expr->leftOperand->primary->id)==0)
+							typeNum=arrayImplicitVars[i]->identifier;
+					}
+					
+					}
+	
+				}
+				//check if they have different built in types, type mismatch
+				if(typeNumID < 14 && typeNum < 14 && typeNumID != typeNum)
+				{
+					printf("%s\n", "ERROR CODE 3"); //type mismatch
+					exit(0);
+				}
+			//if id is impliciit and expr is built in, change id type value to expr type value
+				if(typeNumID >13 && typeNum < 14)
+				{
+					//loop through all types and variables and change identifier to typeNum
+					int j;
+					for(j=0;j<numOfImpVars;j++)
+					{
+						if(arrayImplicitVars[j]->identifier == typeNumID)
+							arrayImplicitVars[j]->identifier = typeNum;
+					}
+					for(j=0;j<numOfExpVars;j++)
+					{
+						if(arrayExplicitVars[j]->identifier == typeNumID)
+							arrayExplicitVars[j]->identifier = typeNum;
+					}
+					for(j=0;j<numOfImpTypes;j++)
+					{
+						if(arrayImplicitTypes[j]->identifier == typeNumID)
+							arrayImplicitTypes[j]->identifier = typeNum;
+					}
+					for(j=0;j<numOfExpTypes;j++)
+					{
+						if(arrayExplicitTypes[j]->identifier == typeNumID)
+							arrayExplicitTypes[j]->identifier = typeNum;
+					}
+				}
+
+				//id and expr are implicit and different types, change everything to type num of expr
+				if(typeNumID >13 && typeNum>13 && typeNumID != typeNum)
+				{
+printf("GOT IN\n");
+printf("BEFORE TYPENUMID:%d\n", typeNumID);
+printf("BEFORE TYPENUM:%d\n", typeNum);
+					//loop through all types and variables and change identifier to typeNum
+					int j;
+					for(j=0;j<numOfImpVars;j++)
+					{
+						if(arrayImplicitVars[j]->identifier == typeNumID)
+							arrayImplicitVars[j]->identifier = typeNum;
+					}
+					for(j=0;j<numOfExpVars;j++)
+					{
+						if(arrayExplicitVars[j]->identifier == typeNumID)
+							arrayExplicitVars[j]->identifier = typeNum;
+					}
+					for(j=0;j<numOfImpTypes;j++)
+					{
+						if(arrayImplicitTypes[j]->identifier == typeNumID)
+							arrayImplicitTypes[j]->identifier = typeNum;
+					}
+					for(j=0;j<numOfExpTypes;j++)
+					{
+						if(arrayExplicitTypes[j]->identifier == typeNumID)
+							arrayExplicitTypes[j]->identifier = typeNum;
+					}
+				
+
+				}
+					
+
 			return assignStmt;
 		} else {
 			syntax_error("assign_stmt. EQUAL expected", line_no);
@@ -1094,7 +1671,6 @@ struct while_stmtNode* while_stmt()
 	
 	if(ttype == WHILE)
 	{
-printf("%s\n","inside while");
 		ttype = getToken();
 		
 		if(ttype == ID ||ttype == NUM || ttype == REALNUM)
@@ -1277,30 +1853,156 @@ struct var_declNode* var_decl()
 	struct var_declNode* varDecl;
 	varDecl = make_var_declNode();
 	ttype = getToken();
-	if (ttype == ID) {
+	if (ttype == ID) 
+	{
 		ungetToken();
 		varDecl->id_list = id_list();
 		ttype = getToken();
 	
-		if (ttype == COLON) {
+		if (ttype == COLON) 
+		{	//check if type has already been declared and given a type value
 			varDecl->type_name = type_name();
+			//check if type name is int
+		int num1;
+		if(varDecl->type_name->type == ID)
+		{
+			int k;
+			num1=-1;
+			//check if its an explicit type
+			for(k=0; k< numOfExpTypes; k++)
+			{
+				if(strcmp(arrayExplicitTypes[k]->id,varDecl->type_name->id)==0)
+					num1 = arrayExplicitTypes[k]->identifier;
+			}
+			for(k=0; k< numOfImpTypes; k++)
+			{
+				if(strcmp(arrayImplicitTypes[k]->id,varDecl->type_name->id)==0)
+					num1 = arrayImplicitTypes[k]->identifier;
+			}
+			//add to implicit array
+			if(num1 == -1)
+			{
+			 num1 = getTypeNum(ID);
+				//check if it has already been declared as a typename in variable declaration
+				int i;
+				int flag = 0;
+			
+				for(i=0;i<numOfExpVars;i++)
+				{
+					if(strcmp(arrayExplicitVars[i]->id,varDecl->type_name->id)==0)
+						flag = 1;
+				}
+				if(flag == 0)
+				{
+					if(checkExpType(varDecl->type_name->id) == 0)
+					{
+					arrayImplicitTypes[numOfImpTypes] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+					arrayImplicitTypes[numOfImpTypes]->id = (char*) malloc(strlen(varDecl->type_name->id+1));
+					arrayImplicitTypes[numOfImpTypes]->identifier = num1;
+					strcpy(arrayImplicitTypes[numOfImpTypes]->id, varDecl->type_name->id);
+					numOfImpTypes++;
+					}
+				}
+				
+				else //(C6)
+				{
+					printf("%s\n", "ERROR CODE 4"); // variable redeclared as type name
+					exit(0);
+
+				}
+			}
+		}
+		else
+			num1=getTypeNum(varDecl->type_name->type);
+				struct id_listNode *node = varDecl->id_list;
+				while(node != NULL)
+				{
+					//(C3) check to see if var has been declared in type section
+					int i;
+					int flag=0;
+			
+					//check explicit types
+					for(i=0;i<numOfExpTypes;i++)
+					{
+						if(strcmp(node->id,arrayExplicitTypes[i]->id)==0)
+							flag = 1;
+					}
+					
+					for(i=0;i<numOfImpTypes;i++)
+					{
+						if(strcmp(node->id,arrayImplicitTypes[i]->id)==0)
+							flag = 1;
+					}
+
+					if(flag == 1)
+					{
+						printf("%s\n","ERROR CODE 1"); //type redeclared as variable
+						exit(0);
+					}
+		
+					flag = 0;
+					//(C4)check if var has already been declared in id_list
+					for(i=0;i<numOfExpVars;i++)
+					{
+						if(strcmp(node->id,arrayExplicitVars[i]->id)==0)
+							flag = 1;
+					}
+	
+					if(flag == 1)
+					{
+						printf("%s\n","ERROR CODE 2"); //variable declared more than once
+						exit(0);		
+					}
+
+					flag = 0;
+					//(C5) check if var was already declared in var type decl
+					for(i=0;i<numOfImpVars;i++)
+					{
+						if(strcmp(node->id,arrayImplicitVars[i]->id)==0)
+						flag = 1;
+					}
+					if(flag == 1)
+					{
+						printf("%s\n","ERROR CODE 1"); //type redeclared as variable
+						exit(0);
+					
+					}
+					else
+					{
+						arrayExplicitVars[numOfExpVars] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+						arrayExplicitVars[numOfExpVars]->id = (char*) malloc(strlen(node->id+1));
+						strcpy(arrayExplicitVars[numOfExpVars]->id, node->id);
+						arrayExplicitVars[numOfExpVars]->identifier = num1;
+						numOfExpVars++;
+						numOfTypes++;
+						node=node->id_list;
+					}
+				}
+			
 			ttype = getToken();
-			if (ttype == SEMICOLON) {
+			if (ttype == SEMICOLON)
+		 	{
 				return varDecl;
 			}
-			 else {
+			else 
+			{
 				syntax_error("var_decl. SEMICOLON expected", line_no);
 				exit(0);
 			}
-		} else {
+		}
+		else 
+		{
 			syntax_error("var_decl. COLON expected", line_no);
 			exit(0);
 		}
-	} else {
+	}
+	 else
+	{
 		syntax_error("var_decl. ID expected", line_no);
 		exit(0);
 	}
 }
+
 
 struct var_decl_listNode* var_decl_list()
 {
@@ -1347,70 +2049,91 @@ struct type_declNode* type_decl()
 	struct type_declNode* typeDecl;
 	typeDecl = make_type_declNode();
 	ttype = getToken();
-	if (ttype == ID) {
+	if (ttype == ID) 
+	{
 		ungetToken();
 
-	//	typeOrVar = 0; //set to Type
 
 		typeDecl->id_list = id_list();
 		ttype = getToken();
-		if (ttype == COLON) {
+		if (ttype == COLON) 
+		{
 			typeDecl->type_name = type_name();
 	
 			int num = getTypeNum(typeDecl->type_name->type);
-printf("%s%d\n","type: ",num);
-printf("%s%d\n","numtype: ",numOfTypes);
 
 			if(num>13) //is an ID, so implicit type, add to implicit array
 			{
-		
-printf("%s%s\n","id: ",typeDecl->type_name->id);
-		
-				arrayImplicitTypes[numOfImplicits] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
-				arrayImplicitTypes[numOfImplicits]->id = (char*) malloc(strlen(typeDecl->type_name->id+1));
-				strcpy(arrayImplicitTypes[numOfImplicits]->id, typeDecl->type_name->id);
-				arrayImplicitTypes[numOfImplicits]->identifier = num;
-printf("%s%d\n","2num",num);
-				numOfImplicits++;
+				arrayImplicitTypes[numOfImpTypes] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+				arrayImplicitTypes[numOfImpTypes]->id = (char*) malloc(strlen(typeDecl->type_name->id+1));
+				strcpy(arrayImplicitTypes[numOfImpTypes]->id, typeDecl->type_name->id);
+				arrayImplicitTypes[numOfImpTypes]->identifier = num;
+				numOfImpTypes++;
 				numOfTypes++;
 			}
 
-//			do //add each id in idlist into explicit array
-//			{
-				arrayExplicitTypes[numOfExplicits] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
-				arrayExplicitTypes[numOfExplicits]->id = (char*) malloc(strlen(typeDecl->id_list->id+1));
-				strcpy(arrayExplicitTypes[numOfExplicits]->id, typeDecl->id_list->id);
-				arrayExplicitTypes[numOfExplicits]->identifier = num;
-				numOfExplicits++;
-				numOfTypes++;
-//			}
-
 			struct id_listNode *node = typeDecl->id_list;
-			while(node->id_list != NULL)
+			while(node != NULL)
 			{
-				node=node->id_list;
-				arrayExplicitTypes[numOfExplicits] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
-				arrayExplicitTypes[numOfExplicits]->id = (char*) malloc(strlen(node->id+1));
-				strcpy(arrayExplicitTypes[numOfExplicits]->id, node->id);
-				arrayExplicitTypes[numOfExplicits]->identifier = num;
-				numOfExplicits++;
-				numOfTypes++;
+				//C2 check if explicit type is already in an id list
+				int i;
+				int flag = 0;
+				for(i=0;i<numOfExpTypes;i++)
+				{
+					if(strcmp(arrayExplicitTypes[i]->id,node->id)==0)
+						flag = 1;
+				}
+
+				if(flag == 1) //ERROR CODE 0 (C2)
+				{
+					printf("%s\n","ERROR CODE 0"); //type name declared more than once
+					exit(0);
+				}
 				
+				flag = 0;
+				for(i=0;i<numOfImpTypes;i++)
+				{
+					if(strcmp(arrayImplicitTypes[i]->id,node->id)==0)
+						flag = 1;
+				}
 				
+				if(flag == 1)
+				{
+					printf("%s\n","ERROR CODE 0"); //type name declared more than once
+					exit(0);
+				}
+				
+				else
+				{
+					arrayExplicitTypes[numOfExpTypes] = (struct typeOrVar*) malloc(sizeof(struct typeOrVar));
+					arrayExplicitTypes[numOfExpTypes]->id = (char*) malloc(strlen(node->id+1));
+					strcpy(arrayExplicitTypes[numOfExpTypes]->id, node->id);
+					arrayExplicitTypes[numOfExpTypes]->identifier = num;
+					numOfExpTypes++;
+					numOfTypes++;
+					node=node->id_list;
+				}
 			}
 			
 			ttype = getToken();
-			if (ttype == SEMICOLON) {
+			if (ttype == SEMICOLON)
+			{
 				return typeDecl;
-			} else {
+			}
+			else
+			{
 				syntax_error("type_decl. SEMICOLON expected", line_no);
 				exit(0);
 			}
-		} else {
+		} 
+		else
+		{
 			syntax_error("type_decl. COLON expected", line_no);
 			exit(0);
 		}
-	} else {
+	}
+	else
+	{
 		syntax_error("type_decl. ID expected", line_no);
 		exit(0);
 	}
@@ -1461,34 +2184,48 @@ struct declNode* decl()
 	dec = make_declNode();
 
 	ttype = getToken();
-	if (ttype == TYPE) {
+	if (ttype == TYPE) 
+	{
 		ungetToken();
 		dec->type_decl_section = type_decl_section();
 		ttype = getToken();
-		if (ttype == VAR) { // type_decl_list is epsilon
+		if (ttype == VAR)
+		{ // type_decl_list is epsilon
 			// or type_decl already parsed and the
 			// next token is checked
 			ungetToken();
 			dec->var_decl_section = var_decl_section();
-		} else {
+		}
+	
+		else 
+		{
 			ungetToken();
 			dec->var_decl_section = NULL;
 		}
 		return dec;
-	} else {
+	}
+	
+	else 
+	{
 		dec->type_decl_section = NULL;
-		if (ttype == VAR) { // type_decl_list is epsilon
+		if (ttype == VAR)
+		{ // type_decl_list is epsilon
 			// or type_decl already parsed and the
 			// next token is checked
 			ungetToken();
 			dec->var_decl_section = var_decl_section();
 			return dec;
-		} else {
-			if (ttype == LBRACE) {
+		}
+		else 
+		{
+			if (ttype == LBRACE) 
+			{
 				ungetToken();
 				dec->var_decl_section = NULL;
 				return dec;
-			} else {
+			} 
+			else 
+			{
 				syntax_error("decl. LBRACE expected", line_no);
 				exit(0); // stop after first syntax error
 			}
@@ -1512,67 +2249,279 @@ struct programNode* program()
 		exit(0); // stop after first syntax error
 	}
 }
+void loopPrintArrays(int x)
+{
+int m;
+			//print explicit types that have same type
+			for(m=0; m<numOfExpTypes;m++)
+			{
+		//		printf("%s%d\n","flag:",flag);
+			if(arrayExplicitTypes[m]->identifier == x  && arrayExplicitTypes[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayExplicitTypes[m]->id); 
+					arrayExplicitTypes[m]->check = 1;
+				}
+			}
 
+			//print implicit types that have same type
+			for(m=0; m<numOfImpTypes;m++)
+			{
+				if(arrayImplicitTypes[m]->identifier == x && arrayImplicitTypes[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayImplicitTypes[m]->id);
+					arrayImplicitTypes[m]->check = 1;
+				}
+			}
+
+			
+			//print explicit variables that have same type
+			for(m=0;m<numOfExpVars;m++)
+			{
+				if(arrayExplicitVars[m]->identifier == x && arrayExplicitVars[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayExplicitVars[m]->id);
+					arrayExplicitVars[m]->check = 1;
+				}
+				
+			}
+			//print implicit variables that have same type
+			for(m=0;m<numOfImpVars;m++)
+			{
+				if(arrayImplicitVars[m]->identifier == x && arrayImplicitVars[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayImplicitVars[m]->id);
+					arrayImplicitVars[m]->check = 1;
+				}
+				
+			}
+}
 void printTypes()
 {
-	int arrayT[100];
-	int numInArray=0;
 	int i;
-	for(i=0; i<numOfExplicits;i++)
+//print all types of type int if there are any
+//check if type int is in any array
+int isInt;
+isInt=0;
+if(checkArray(arrayExplicitTypes,10,numOfExpTypes)==1)
+	isInt = 1;
+if(checkArray(arrayImplicitTypes,10,numOfImpTypes) == 1)
+	isInt = 1;
+
+if(checkArray(arrayExplicitVars,10,numOfExpVars) == 1)
+	isInt = 1;
+
+if(checkArray(arrayImplicitVars,10,numOfImpVars) == 1)
+	isInt = 1;
+if(isInt ==1)
+{
+	printf("INT:");
+	loopPrintArrays(10);
+	printf("\n");
+}	
+
+//print all REAL types
+isInt=0;
+if(checkArray(arrayExplicitTypes,11,numOfExpTypes)==1)
+	isInt = 1;
+if(checkArray(arrayImplicitTypes,11,numOfImpTypes) == 1)
+	isInt = 1;
+
+if(checkArray(arrayExplicitVars,11,numOfExpVars) == 1)
+	isInt = 1;
+
+if(checkArray(arrayImplicitVars,11,numOfImpVars) == 1)
+	isInt = 1;
+if(isInt ==1)
+{
+	printf("REAL:");
+	loopPrintArrays(11);
+	printf("\n");
+}	
+isInt=0;
+if(checkArray(arrayExplicitTypes,12,numOfExpTypes)==1)
+{
+	isInt = 1;
+}
+if(checkArray(arrayImplicitTypes,12,numOfImpTypes) == 1)
+	isInt = 1;
+
+if(checkArray(arrayExplicitVars,12,numOfExpVars) == 1)
+	isInt = 1;
+
+if(checkArray(arrayImplicitVars,12,numOfImpVars) == 1)
+	isInt = 1;
+if(isInt ==1)
+{
+	printf("STRING:");
+	loopPrintArrays(12);
+	printf("\n");
+}
+isInt=0;
+if(checkArray(arrayExplicitTypes,13,numOfExpTypes)==1)
+	isInt = 1;
+if(checkArray(arrayImplicitTypes,13,numOfImpTypes) == 1)
+	isInt = 1;
+if(checkArray(arrayExplicitVars,13,numOfExpVars) == 1)
+	isInt = 1;
+
+if(checkArray(arrayImplicitVars,13,numOfImpVars) == 1)
+	isInt = 1;
+if(isInt ==1)
+{
+	printf("BOOLEAN:");
+	loopPrintArrays(13);
+	printf("\n");
+}	
+	
+	//print all types
+	for(i=0; i<numOfExpTypes;i++)
 	{
 		int n;
 		int j;
-		int skip=0;
-		//check if type has already been printed
-		for(j=0;j<numInArray;j++)
-		{
-			if(arrayT[j]==arrayExplicitTypes[i]->identifier)
-				skip =1;
-		}
-
 		//if type hasn't been printed
-		if(skip==0)
+		if(arrayExplicitTypes[i]->check==0)
 		{
-			//check if type is a built in type
-			if(arrayExplicitTypes[i]->identifier<14)
+			printf("%s%s", arrayExplicitTypes[i]->id,":");
+		
+			int n;
+			//print explicit types that have same type
+			for(n=i+1; n<numOfExpTypes;n++)
 			{
-				if(arrayExplicitTypes[i]->identifier==10)
-					printf("%s", "INT:");
-				if(arrayExplicitTypes[i]->identifier==11)
-					printf("%s", "REAL:");
-				if(arrayExplicitTypes[i]->identifier==12)
-					printf("%s", "STRING:");
-				if(arrayExplicitTypes[i]->identifier==13)
-					printf("%s", "BOOLEAN:");
-				n=i;
-			}
-			else
-			{
-				printf("%s%s", arrayExplicitTypes[i]->id,":");
-				n=i+1;
-			}
-			arrayT[numInArray]=arrayExplicitTypes[i]->identifier;
-			numInArray++;
-			for(n; n<numOfExplicits;n++)
-			{
-				if(arrayExplicitTypes[i]->identifier == arrayExplicitTypes[n]->identifier)
+				if(arrayExplicitTypes[n]->identifier == arrayExplicitTypes[i]->identifier && arrayExplicitTypes[n]->check == 0)
 				{
 					printf("%s%s", " ", arrayExplicitTypes[n]->id); 
+					arrayExplicitTypes[n]->check = 1;
 				}
 			}
 			int m;
-			for(m=0; m<numOfImplicits;m++)
+
+			//print implicit types that have same type
+			for(m=0; m<numOfImpTypes;m++)
 			{
-				if(arrayExplicitTypes[i]->identifier == arrayImplicitTypes[m]->identifier)
+				if(arrayExplicitTypes[i]->identifier == arrayImplicitTypes[m]->identifier && arrayImplicitTypes[m]->check == 0)
 				{
 					printf("%s%s", " ", arrayImplicitTypes[m]->id);
+					arrayImplicitTypes[m]->check = 1;
 				}
+			}
+
+			
+			//print explicit variables that have same type
+			for(m=0;m<numOfExpVars;m++)
+			{
+				if(arrayExplicitTypes[i]->identifier == arrayExplicitVars[m]->identifier && arrayExplicitVars[m]->check==0)
+				{
+					printf("%s%s", " ", arrayExplicitVars[m]->id);
+					arrayExplicitVars[m]->check = 1;
+				}
+				
+			}
+			//print implicit variables that have same type
+			for(m=0;m<numOfImpVars;m++)
+			{
+				if(arrayExplicitTypes[i]->identifier == arrayImplicitVars[m]->identifier && arrayImplicitVars[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayImplicitVars[m]->id);
+					arrayImplicitVars[m]->check = 1;
+				}
+				
 			}
 		printf("\n");
 		}
 	}
 
+	//print implicit types
+	for(i=0;i<numOfImpTypes;i++)
+	{	int k;
+
+		if(arrayImplicitTypes[i]->check == 0)
+		{
+			printf("%s%s", arrayImplicitTypes[i]->id,":");
+	
+			int m;	
+			//print explicit variables that have same type
+			for(m=0;m<numOfExpVars;m++)
+			{
+				if(arrayImplicitTypes[i]->identifier == arrayExplicitVars[m]->identifier && arrayExplicitVars[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayExplicitVars[m]->id);
+					arrayExplicitVars[m]->check = 1;
+				}
+				
+			}
+			//print implicit variables that have same type
+			for(m=0;m<numOfImpVars;m++)
+			{
+				if(arrayImplicitTypes[i]->identifier == arrayImplicitVars[m]->identifier && arrayImplicitVars[m]->check == 0)
+				{
+					printf("%s%s", " ", arrayImplicitVars[m]->id);
+					arrayImplicitVars[m]->check = 1;
+				}
+				
+			}
+
+}		printf("\n");
+	}
+//	print implicit variables
+	for(i=0;i<numOfImpVars;i++)
+	{
+		int first = 0;
+		int j;
+		if(arrayImplicitVars[i]->check == 0)
+		{
+			if(first == 0)
+			{
+				printf("%s%s", arrayImplicitVars[i]->id, ":");
+				first = 1;
+				arrayImplicitVars[i]->check = 1;
+			}
+			else
+			{
+				printf("%s%s"," ", arrayImplicitVars[i]->id);
+				arrayImplicitVars[i]->check = 1;
+			}
+			int k;
+			for(k=0;k<numOfImpVars;k++)
+			{
+				if(arrayImplicitVars[k]->check == 0 && arrayImplicitVars[k]->identifier == arrayImplicitVars[i]->identifier)
+				{
+					printf("%s%s", " ", arrayImplicitVars[k]->id);
+					arrayImplicitVars[k]->check = 1;
+				}
+			}
+		}
+		
+		printf("\n");
+		
+	}
+
 }
+
+int checkArray(struct typeOrVar* array[], int x,int length)
+{
+	int flag=0;
+	int i;
+	for(i=0;i<length;i++)
+	{
+	if(array[i]->identifier==x)
+			flag = 1;
+	}
+	
+	return flag;
+}
+/*
+int checkArrayInt(int array[], char* id,int length)
+{
+	int flag=0;
+	int i;
+	for(i=0;i<length;i++)
+	{
+	if(strcmp(array[i],id)==0)
+			flag = 1;
+	}
+	
+	return flag;
+}*/
 
 // COMMON mistakes:
 //    *     = instead of ==
@@ -1582,17 +2531,27 @@ int main()
 {
 	struct programNode* parseTree;
 	parseTree = program();
-	print_parse_tree(parseTree);
+//	print_parse_tree(parseTree);
 	freeProgramMem(parseTree);
 	int i;
-	for(i=0;i<numOfExplicits;i++)
+
+	for(i=0;i<numOfExpTypes;i++)
 	{
-		printf("%s%d%s%s%s%d\n", "Explicit[",i,"]:",arrayExplicitTypes[i]->id, "num: ",arrayExplicitTypes[i]->identifier);
+		printf("%s%d%s%s%s%d\n", "ExplicitTypes[",i,"]:",arrayExplicitTypes[i]->id, "num: ",arrayExplicitTypes[i]->identifier);
 	}
-	for(i=0;i<numOfImplicits;i++)
+	for(i=0;i<numOfImpTypes;i++)
 	{
-		printf("%s%d%s%s%s%d\n", "Implicit[",i,"]:",arrayImplicitTypes[i]->id, "num: ",arrayImplicitTypes[i]->identifier);
+		printf("%s%d%s%s%s%d\n", "ImplicitTypes[",i,"]:",arrayImplicitTypes[i]->id, "num: ",arrayImplicitTypes[i]->identifier);
 	}
+	for(i=0;i<numOfExpVars;i++)
+	{
+		printf("%s%d%s%s%s%d\n", "ExplicitVars[",i,"]:",arrayExplicitVars[i]->id, "num: ",arrayExplicitVars[i]->identifier);
+	}
+	for(i=0;i<numOfImpVars;i++)
+	{
+		printf("%s%d%s%s%s%d\n", "ImplicitVars[",i,"]:",arrayImplicitVars[i]->id, "num: ",arrayImplicitVars[i]->identifier);
+	}
+	
 	printTypes();
 	freeArrays();
 	printf("\nSUCCESSFULLY PARSED INPUT!\n");
